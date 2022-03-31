@@ -40,12 +40,17 @@
 #include "net/ip/uip-debug.h"
 
 #define SEND_INTERVAL		(5 * CLOCK_SECOND)
-#define MAX_PAYLOAD_LEN		(40)
+#define MAX_PAYLOAD_LEN		(1)
 #define CONN_PORT     (8802)
 #define MDNS (1)
+
 #define LED_TOGGLE_REQUEST (0x79)
+#define LED_SET_STATE (0x7A)
+#define LED_GET_STATE (0x7B)
+#define LED_STATE (0x7C)
 
 static char buf[MAX_PAYLOAD_LEN];
+static char response[2];
 
 static struct uip_udp_conn *client_conn;
 
@@ -56,15 +61,52 @@ static struct uip_udp_conn *client_conn;
 PROCESS(udp_client_process, "UDP client process");
 AUTOSTART_PROCESSES(&resolv_process,&udp_client_process);
 /*---------------------------------------------------------------------------*/
+
+static void send_response(char value) {
+    response[0] = LED_STATE;
+    response[1] = value;
+    uip_ipaddr_copy(&client_conn->ripaddr, &UIP_IP_BUF->srcipaddr);
+    client_conn->rport = UIP_UDP_BUF->destport;
+    uip_udp_packet_send(client_conn, response, uip_datalen());
+    PRINTF("Enviando LED_STATE=%d para [", value);
+    PRINT6ADDR(&client_conn->ripaddr);
+    PRINTF("]:%u\n", UIP_HTONS(client_conn->rport));
+}
+
 static void
 tcpip_handler(void)
 {
+    static char led_state = 0;
     char *dados;
 
     if(uip_newdata()) {
         dados = uip_appdata;
         dados[uip_datalen()] = '\0';
-        printf("Response from the server: '%s'\n", dados);
+        switch (dados[0]) {
+        case LED_SET_STATE:
+            printf("LED_SET_STATE recebido do servidor: %d\n", dados[1]);
+            leds_off(LEDS_GREEN|LEDS_RED);
+            switch (dados[1]) {
+            case 0:
+                break;
+            case 1:
+                leds_on(LEDS_GREEN);
+                break;
+            case 2:
+                leds_on(LEDS_RED);
+                break;
+            case 3:
+                leds_on(LEDS_GREEN|LEDS_RED);
+                break;
+            }
+            led_state = dados[1];
+            send_response(led_state);
+            break;
+        case LED_GET_STATE:
+            printf("LED_GET_STATE recebido do servidor\n");
+            send_response(led_state);
+            break;
+        }
     }
 }
 /*---------------------------------------------------------------------------*/
@@ -81,7 +123,7 @@ timeout_handler(void)
     PRINTF("Enviando LED_TOGGLE_REQUEST para [");
     PRINT6ADDR(&client_conn->ripaddr);
     PRINTF("]:%u\n", UIP_HTONS(client_conn->rport));
-    uip_udp_packet_send(client_conn, buf, strlen(buf));
+    uip_udp_packet_send(client_conn, buf, sizeof(MAX_PAYLOAD_LEN));
 }
 /*---------------------------------------------------------------------------*/
 static void
