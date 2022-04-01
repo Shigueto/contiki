@@ -15,13 +15,12 @@
 #define ADC_IN ADC_COMPB_IN_AUXIO7
 
 #define MAX_ADC_OUTPUT_VALUE    15
-#define MAX_ADC_INPUT_VALUE     3320000
+#define MAX_ADC_INPUT_VALUE     3320288
 
 PROCESS(init, "init");
-PROCESS(read_button, "Leitura dos botões para incrementar o contador");
 PROCESS(read_adc, "Leitura de input de ADC");
 
-AUTOSTART_PROCESSES(&init, &read_button, &read_adc);
+AUTOSTART_PROCESSES(&init, &read_adc);
 
 
 PROCESS_THREAD(init, ev, data)
@@ -42,33 +41,14 @@ void set_leds(uint16_t value) {
     GPIO_writeDio(LED4, (value&0x8)==8);
 }
 
-PROCESS_THREAD(read_button, ev, data)
-{
-    static uint16_t i = 0;
-    PROCESS_BEGIN();
-
-    while(1){
-        PROCESS_YIELD();
-
-        if(ev == sensors_event){
-            if(data == &button_left_sensor) {
-                i--;
-                set_leds(i);
-            } else if (data == &button_right_sensor) {
-                i++;
-                set_leds(i);
-            }
-            printf("counter=%d\n", i);
-        }
-    }
-    PROCESS_END();
-    return 0;
-}
-
 static struct etimer et_read;
 
 uint16_t convert_data_to_value(uint32_t data) {
-    return (MAX_ADC_INPUT_VALUE - data)*MAX_ADC_OUTPUT_VALUE/MAX_ADC_INPUT_VALUE;
+    if (data < 5000) {
+        data = 0;
+    }
+    uint16_t result = (MAX_ADC_INPUT_VALUE - data)*MAX_ADC_OUTPUT_VALUE/MAX_ADC_INPUT_VALUE;
+    return result == 1293 ? 0 : result;
 }
 
 PROCESS_THREAD(read_adc, ev, data)
@@ -85,8 +65,9 @@ PROCESS_THREAD(read_adc, ev, data)
         if (ev == PROCESS_EVENT_TIMER) {
             SENSORS_ACTIVATE(*sensor);
             sensor->configure(ADC_SENSOR_SET_CHANNEL, ADC_IN);
-            int value = sensor->value(ADC_SENSOR_VALUE);
-            printf("read value=%d\n", convert_data_to_value(value));
+            uint16_t value = convert_data_to_value(sensor->value(ADC_SENSOR_VALUE));
+            printf("read value=%d\n", value);
+            set_leds(value);
             SENSORS_DEACTIVATE(*sensor);
             etimer_reset(&et_read);
         }

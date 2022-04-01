@@ -1,4 +1,4 @@
-CONTIKI_PROJECT = hwsensors
+CONTIKI_PROJECT = final-embarcados
 all: $(CONTIKI_PROJECT)
 
 CONTIKI = ../..
