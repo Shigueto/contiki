@@ -11,6 +11,8 @@
 
 #include <stdio.h> /* For printf() */
 
+#define EVENT_BUTTON      (44)
+
 #define LED1 BOARD_IOID_DIO25
 #define LED2 BOARD_IOID_DIO26
 #define LED3 BOARD_IOID_DIO27
@@ -23,18 +25,31 @@
 #define MAX_ADC_OUTPUT_VALUE    15
 #define MAX_ADC_INPUT_VALUE     3320288
 
+#define BUTTON  BOARD_IOID_DIO30
+
 PROCESS(init, "init");
 PROCESS(read_adc, "Leitura de input de ADC");
+PROCESS(read_gpio_button, "Leitura do botão GPIO");
 
-AUTOSTART_PROCESSES(&init, &read_adc);
+AUTOSTART_PROCESSES(&init, &read_adc, &read_gpio_button);
 
 static struct etimer et_read;
+static struct etimer et_press;
 
 void set_leds(uint16_t value) {
     GPIO_writeDio(LED1, (value&0x1)==1);
     GPIO_writeDio(LED2, (value&0x2)==2);
     GPIO_writeDio(LED3, (value&0x4)==4);
     GPIO_writeDio(LED4, (value&0x8)==8);
+}
+
+void set_pwm(uint32_t loadvalue, uint16_t value) {
+    uint16_t current_duty = value*100/MAX_ADC_OUTPUT_VALUE;
+    uint32_t ticks = (current_duty * loadvalue) / 100;
+    if (ticks == 0) {
+        ticks = 1;
+    }
+    ti_lib_timer_match_set(GPT0_BASE, TIMER_A, loadvalue - ticks);
 }
 
 int16_t convert_data_to_value(uint32_t data) {
@@ -110,6 +125,7 @@ int32_t pwminit(int32_t freq)
 PROCESS_THREAD(init, ev, data)
 {
     PROCESS_BEGIN();
+    GPIO_setOutputEnableDio(BUTTON, GPIO_OUTPUT_DISABLE);
     GPIO_setOutputEnableDio(LED1, GPIO_OUTPUT_ENABLE);
     GPIO_setOutputEnableDio(LED2, GPIO_OUTPUT_ENABLE);
     GPIO_setOutputEnableDio(LED3, GPIO_OUTPUT_ENABLE);
@@ -118,13 +134,36 @@ PROCESS_THREAD(init, ev, data)
     PROCESS_END();
 }
 
+PROCESS_THREAD(read_gpio_button, ev, data)
+{
+    PROCESS_BEGIN();
+    static uint16_t pressed_counter = 0;
 
+    etimer_set(&et_press, CLOCK_SECOND/100);
+    while (1) {
+        PROCESS_YIELD();
+        if (ev == PROCESS_EVENT_TIMER) {
+            if(pressed_counter >= 20){
+                pressed_counter=0;
+                process_post(&read_adc, EVENT_BUTTON, NULL);
+            }
+
+            if (GPIO_readDio(BUTTON) == 0) {
+                pressed_counter++;
+            }
+            etimer_reset(&et_press);
+        }
+    }
+    PROCESS_END();
+    return 0;
+}
 
 PROCESS_THREAD(read_adc, ev, data)
 {
     static struct sensors_sensor *sensor;
-    static int16_t current_duty = 0;
-    static int32_t loadvalue;
+    static uint32_t loadvalue;
+    static uint16_t value = 0;
+    static uint8_t isPwm = 0;
 
     PROCESS_BEGIN();
     loadvalue = pwminit(5000);
@@ -138,21 +177,25 @@ PROCESS_THREAD(read_adc, ev, data)
         if (ev == PROCESS_EVENT_TIMER) {
             SENSORS_ACTIVATE(*sensor);
             sensor->configure(ADC_SENSOR_SET_CHANNEL, ADC_IN);
-            uint16_t value = convert_data_to_value(sensor->value(ADC_SENSOR_VALUE));
+            value = convert_data_to_value(sensor->value(ADC_SENSOR_VALUE));
             printf("read value=%d\n", value);
-            if (true) {
-                current_duty = value*100/MAX_ADC_OUTPUT_VALUE;
-                uint32_t ticks = (current_duty * loadvalue) / 100;
-                //printf("ticks=%d, duty=%d\n", ticks, current_duty);
-                if (ticks == 0) {
-                    ticks = 1;
-                }
-                ti_lib_timer_match_set(GPT0_BASE, TIMER_A, loadvalue - ticks);
+            if (isPwm == 1) {
+                set_pwm(loadvalue, value);
             } else {
                 set_leds(value);
             }
             SENSORS_DEACTIVATE(*sensor);
             etimer_reset(&et_read);
+        } else if (ev == EVENT_BUTTON) {
+            isPwm = !isPwm;
+            printf("button pressed, isPwm=%d", isPwm);
+            if (isPwm == 1) {
+                set_leds(0);
+                set_pwm(loadvalue, value);
+            } else {
+                set_leds(value);
+                set_pwm(loadvalue, 0);
+            }
         }
     }
     PROCESS_END();
