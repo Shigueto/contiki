@@ -1,4 +1,4 @@
-CONTIKI_PROJECT = final-embarcados
+CONTIKI_PROJECT = display-7-segments
 all: $(CONTIKI_PROJECT)
 
 CONTIKI = ../..
