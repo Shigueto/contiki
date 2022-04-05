@@ -1,4 +1,4 @@
-all: udp-client-atividade4
+all: udp-client-atividade5
 
 CFLAGS += -DPROJECT_CONF_H=\"project-conf.h\"
 CONTIKI = ../..
