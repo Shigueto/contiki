@@ -152,6 +152,13 @@ publish_receiver(struct mqtt_sn_connection *mqc, const uip_ipaddr_t *source_addr
     printf("unknown publication received\n");
   }
 
+  int value = atoi(incoming_packet.data);
+
+  if (value > 0) {
+      leds_on(LEDS_ALL);
+  } else {
+      leds_off(LEDS_ALL);
+  }
 }
 /*---------------------------------------------------------------------------*/
 static void
@@ -299,7 +306,7 @@ set_connection_address(uip_ipaddr_t *ipaddr)
 {
 #ifndef UDP_CONNECTION_ADDR
 #if RESOLV_CONF_SUPPORTS_MDNS
-#define UDP_CONNECTION_ADDR       pksr.eletrica.eng.br
+#define UDP_CONNECTION_ADDR       labscpi.eletrica.eng.br //pksr.eletrica.eng.br
 #elif UIP_CONF_ROUTER
 #define UDP_CONNECTION_ADDR       fd00:0:0:0:0212:7404:0004:0404
 #else
@@ -389,21 +396,22 @@ PROCESS_THREAD(example_mqttsn_process, ev, data)
     uip_nameserver_update(&google_dns, UIP_NAMESERVER_INFINITE_LIFETIME);
   }
 
-  status = RESOLV_STATUS_UNCACHED;
-  while(status != RESOLV_STATUS_CACHED) {
-    status = set_connection_address(&broker_addr);
+//  status = RESOLV_STATUS_UNCACHED;
+//  while(status != RESOLV_STATUS_CACHED) {
+//    status = set_connection_address(&broker_addr);
+//
+//    if(status == RESOLV_STATUS_RESOLVING) {
+//      //PROCESS_WAIT_EVENT_UNTIL(ev == resolv_event_found);
+//      PROCESS_WAIT_EVENT();
+//    } else if(status != RESOLV_STATUS_CACHED) {
+//      PRINTF("Can't get connection address.\n");
+//      etimer_set(&periodic_timer, 2*CLOCK_SECOND);
+//      PROCESS_WAIT_EVENT();
+//    }
+//  }
 
-    if(status == RESOLV_STATUS_RESOLVING) {
-      //PROCESS_WAIT_EVENT_UNTIL(ev == resolv_event_found);
-      PROCESS_WAIT_EVENT();
-    } else if(status != RESOLV_STATUS_CACHED) {
-      PRINTF("Can't get connection address.\n");
-      etimer_set(&periodic_timer, 2*CLOCK_SECOND);
-      PROCESS_WAIT_EVENT();
-    }
-  }
-
-  //uip_ip6addr(&broker_addr, 0x2804,0x7f4,0x3b80,0xcdf7,0x241b,0x1ab2,0xa46a,0x9912);//172.16.220.128 with tayga
+  // labscpi.eletrica.eng.br 2801:82:c004:103::11
+  uip_ip6addr(&broker_addr, 0x2801, 0x82, 0xc004, 0x103, 0, 0, 0, 0x11);
 
   mqtt_sn_create_socket(&mqtt_sn_c,UDP_PORT, &broker_addr, UDP_PORT);
   (&mqtt_sn_c)->mc = &mqtt_sn_call;
@@ -458,7 +466,7 @@ PROCESS_THREAD(example_mqttsn_process, ev, data)
     {
       PROCESS_WAIT_EVENT();
       if(etimer_expired(&et)) {
-        leds_toggle(LEDS_ALL);
+        //leds_toggle(LEDS_ALL);
         etimer_restart(&et);
       }
     }
