@@ -1,4 +1,4 @@
-all: mqtt-example
+all: mqtt-leds
 #all: example
 
 WITH_UIP6=1
