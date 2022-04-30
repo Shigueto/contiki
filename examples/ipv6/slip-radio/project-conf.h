@@ -54,7 +54,7 @@
 #define CMD_CONF_HANDLERS slip_radio_cmd_handler
 #endif
 
-//#define RF_CHANNEL (25) //O padrão é canal 25, se quiser o 6LBR em outro canal, é necessário definir aqui
+#define RF_CHANNEL (20) //O padrão é canal 25, se quiser o 6LBR em outro canal, é necessário definir aqui
 
 /* configuration for the slipradio/network driver */
 #undef NETSTACK_CONF_MAC
