@@ -221,7 +221,6 @@ float stof(const char* s)
 static void
 publish_receiver(struct mqtt_sn_connection *mqc, const uip_ipaddr_t *source_addr, const uint8_t *data, uint16_t datalen)
 {
-	static uint8_t str[32];
 	static uint32_t topic_id = 0;
 	static int32_t topic_index=-1;
 	static uint32_t i;
@@ -232,7 +231,7 @@ publish_receiver(struct mqtt_sn_connection *mqc, const uip_ipaddr_t *source_addr
 	memcpy(&incoming_packet, data, datalen);
 	incoming_packet.data[datalen-7] = 0x00;
 	topic_id = uip_htons(incoming_packet.topic_id);
-	LOG_INFO("Published message received (topic %d): %s\n", topic_id, incoming_packet.data);
+	LOG_INFO("Published message received (topic %d): %s\n", (int)topic_id, incoming_packet.data);
 
 	//find topic index
 	for(i=0;i<NUM_TOPICS;i++)
@@ -310,7 +309,6 @@ static const struct mqtt_sn_callbacks mqtt_sn_call = {
 PROCESS_THREAD(registration_subscription_process, ev, data)
 {
 	static uint32_t subscription_tries=0;
-	static uint32_t registration_tries=0;
 	static uint32_t timeout=0;
 	static uint32_t i;
 	static mqtt_sn_subscribe_request *req = &subreq;
@@ -409,11 +407,9 @@ static void connection_timer_callback(void *mqc)
 PROCESS_THREAD(example_mqttsn_process, ev, data)
 {
 	static struct etimer periodic_timer;
-	static struct etimer et;
-	static uip_ipaddr_t broker_addr,google_dns, utfpr_dns;
+	static uip_ipaddr_t broker_addr, dns;
 	static uint8_t connection_retries = 0;
 	resolv_status_t status = RESOLV_STATUS_ERROR;
-	char contiki_hostname[16];
 
 	PROCESS_BEGIN();
 
@@ -424,9 +420,9 @@ PROCESS_THREAD(example_mqttsn_process, ev, data)
 	mqtt_sn_set_debug(1);
 
 #ifdef UTFPR_ENV
-    uip_ip6addr(&utfpr_dns, 0x2801, 0x82, 0xc004, 0x1, 0x1ce, 0x1ce, 0xbabe, 0x1);
+    uip_ip6addr(&dns, 0x2801, 0x82, 0xc004, 0x1, 0x1ce, 0x1ce, 0xbabe, 0x1);
 #else
-    uip_ip6addr(&google_dns, 0x2001, 0x4860, 0x4860, 0x0, 0x0, 0x0, 0x0, 0x8888);
+    uip_ip6addr(&dns, 0x2001, 0x4860, 0x4860, 0x0, 0x0, 0x0, 0x0, 0x8888);
 #endif
 
 	etimer_set(&periodic_timer, 2*CLOCK_SECOND);
@@ -447,11 +443,11 @@ PROCESS_THREAD(example_mqttsn_process, ev, data)
         // This is to solve DNS problem, in which the google DNS could not be
         // authenticated
         DEBUG("Using UTFPR DNS -> 2801:82:c004:1:1ce:1ce:babe:1 ...\n");
-        uip_nameserver_update(&utfpr_dns, UIP_NAMESERVER_INFINITE_LIFETIME);
+        uip_nameserver_update(&dns, UIP_NAMESERVER_INFINITE_LIFETIME);
 #else
         //uip_ipaddr_copy(sixlbr_addr, globaladdr);
 	    DEBUG("Using Google DNS -> 2001:4860:4860::8888 ...\n");
-		uip_nameserver_update(&google_dns, UIP_NAMESERVER_INFINITE_LIFETIME);
+		uip_nameserver_update(&dns, UIP_NAMESERVER_INFINITE_LIFETIME);
 #endif
 	}
 
@@ -533,12 +529,9 @@ PROCESS_THREAD(example_mqttsn_process, ev, data)
 /*this process will publish data at regular intervals*/
 PROCESS_THREAD(publish_process, ev, data)
 {
-  static uint8_t registration_tries;
   static struct etimer send_timer;
   static uint32_t buf_len;
   static char buf[32];
-  static mqtt_sn_register_request *rreq = &regreq;
-
 
   PROCESS_BEGIN();
   send_interval = DEFAULT_SEND_INTERVAL;
@@ -549,7 +542,7 @@ PROCESS_THREAD(publish_process, ev, data)
       PROCESS_WAIT_EVENT();
       if(ev == PROCESS_EVENT_TIMER)
       {
-          int32_t r = rand() % 100;
+          int r = rand() % 100;
           sprintf(buf, "%d", r);
           buf_len = strlen(buf);
           mqtt_sn_send_publish(&mqtt_sn_c, mqtt_topic_ids[UPSTREAM],MQTT_SN_TOPIC_TYPE_NORMAL,buf, buf_len,qos,retain);
