@@ -2,7 +2,11 @@
 #ifndef PROJECT_CONF_H_
 #define PROJECT_CONF_H_
 
+#ifdef UTFPR_ENV
+#define RF_CORE_CONF_CHANNEL (25)
+#else
 #define RF_CORE_CONF_CHANNEL (20)
+#endif
 
 #undef UIP_CONF_ROUTER
 #define UIP_CONF_ROUTER (1)

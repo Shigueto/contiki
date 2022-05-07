@@ -48,13 +48,19 @@
 #define LOG_INFO printf
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <inttypes.h>
 #include "dev/leds.h"
 
 #define UDP_PORT 1883
 #define USE_MDNS (1) //set to 1 and the code will try to resolve the address below, otherwise, you must set the connection address manually
+
+#ifdef UTFPR_ENV
 #define BROKER_ADDRESS labscpi.eletrica.eng.br
+#else
+#define BROKER_ADDRESS shigueto.akishino.mooo.com
+#endif
 
 #define REQUEST_RETRIES 4
 #define DEFAULT_SEND_INTERVAL		(4 * CLOCK_SECOND)
@@ -252,7 +258,7 @@ publish_receiver(struct mqtt_sn_connection *mqc, const uip_ipaddr_t *source_addr
     case CONTROL_RED:
     {
         LOG_INFO("Control red message (%s): %s\n", topics[CONTROL_RED], incoming_packet.data);
-        int i=atoi(incoming_packet.data);
+        int i = atoi(incoming_packet.data);
         if (i != 1) {
             leds_off(LEDS_RED);
         } else {
@@ -263,7 +269,7 @@ publish_receiver(struct mqtt_sn_connection *mqc, const uip_ipaddr_t *source_addr
     case CONTROL_GREEN:
     {
         LOG_INFO("Control green message (%s): %s\n", topics[CONTROL_GREEN], incoming_packet.data);
-        int i=atoi(incoming_packet.data);
+        int i = atoi(incoming_packet.data);
         if (i != 1) {
             leds_off(LEDS_GREEN);
         } else {
@@ -417,8 +423,11 @@ PROCESS_THREAD(example_mqttsn_process, ev, data)
 
 	mqtt_sn_set_debug(1);
 
-	uip_ip6addr(&google_dns, 0x2001, 0x4860, 0x4860, 0x0, 0x0, 0x0, 0x0, 0x8888);
-	uip_ip6addr(&utfpr_dns, 0x2801, 0x82, 0xc004, 0x1, 0x1ce, 0x1ce, 0xbabe, 0x1);
+#ifdef UTFPR_ENV
+    uip_ip6addr(&utfpr_dns, 0x2801, 0x82, 0xc004, 0x1, 0x1ce, 0x1ce, 0xbabe, 0x1);
+#else
+    uip_ip6addr(&google_dns, 0x2001, 0x4860, 0x4860, 0x0, 0x0, 0x0, 0x0, 0x8888);
+#endif
 
 	etimer_set(&periodic_timer, 2*CLOCK_SECOND);
 	while(uip_ds6_get_global(ADDR_PREFERRED) == NULL)
@@ -434,14 +443,16 @@ PROCESS_THREAD(example_mqttsn_process, ev, data)
 	rpl_dag_t *dag = rpl_get_any_dag();
 #if USE_MDNS==1
 	if(dag) {
-		//uip_ipaddr_copy(sixlbr_addr, globaladdr);
-	    //DEBUG("Using Google DNS -> 2001:4860:4860::8888 ...\n");
-		//uip_nameserver_update(&google_dns, UIP_NAMESERVER_INFINITE_LIFETIME);
-
-	    // This is to solve DNS problem, in which the google DNS could not be
-	    // authenticated
-		DEBUG("Using UTFPR DNS -> 2801:82:c004:1:1ce:1ce:babe:1 ...\n");
-		uip_nameserver_update(&utfpr_dns, UIP_NAMESERVER_INFINITE_LIFETIME);
+#ifdef UTFPR_ENV
+        // This is to solve DNS problem, in which the google DNS could not be
+        // authenticated
+        DEBUG("Using UTFPR DNS -> 2801:82:c004:1:1ce:1ce:babe:1 ...\n");
+        uip_nameserver_update(&utfpr_dns, UIP_NAMESERVER_INFINITE_LIFETIME);
+#else
+        //uip_ipaddr_copy(sixlbr_addr, globaladdr);
+	    DEBUG("Using Google DNS -> 2001:4860:4860::8888 ...\n");
+		uip_nameserver_update(&google_dns, UIP_NAMESERVER_INFINITE_LIFETIME);
+#endif
 	}
 
 	status = RESOLV_STATUS_UNCACHED;
