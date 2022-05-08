@@ -64,7 +64,7 @@
 
 #define REQUEST_RETRIES 4
 #define DEFAULT_SEND_INTERVAL		(4 * CLOCK_SECOND)
-#define REPLY_TIMEOUT (3 * CLOCK_SECOND)
+#define REPLY_TIMEOUT (5 * CLOCK_SECOND)
 
 static struct mqtt_sn_connection mqtt_sn_c;
 static resolv_status_t set_connection_address(uip_ipaddr_t *ipaddr);
