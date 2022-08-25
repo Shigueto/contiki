@@ -59,7 +59,7 @@
 #ifdef UTFPR_ENV
 #define BROKER_ADDRESS labscpi.eletrica.eng.br
 #else
-#define BROKER_ADDRESS shigueto.akishino.mooo.com
+#define BROKER_ADDRESS aakishino.2204.mooo.com
 #endif
 
 #define REQUEST_RETRIES 4
